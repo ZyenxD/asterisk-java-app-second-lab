@@ -4,23 +4,70 @@
 
 import org.asteriskjava.fastagi.*;
 
+import java.io.IOException;
+import java.lang.Math;
+
 public class HelloAgiScript extends BaseAgiScript{
-    public String getGreeting() {
-        return "Hello world.";
-    }
+
+    static public String THANKS_AUDIO_FILE_ROUTE = "/usr/share/asterisk/sounds/en/auth-thankyou";
+    static public String SOX_COMMAND = "/usr/bin/sox";
+    static public String GOOGLE_ASSISTANT_COMMAND = "googlesamples-assistant-pushtotalk";
+    static public String GOOGLE_ASSISTANT_JSON_FILE_ROUTE = "/home/pi/.config/google-oauthlib-tool/credentials.json";
 
     public static void main(String[] args) {
-        System.out.println(new HelloAgiScript().getGreeting());
+        
     }
 
     @Override
     public void service(AgiRequest request, AgiChannel channel) throws AgiException {
+        String fileName = "/tmp/google_audio"+Math.random();
+        String googleOptions = String.format("--credentials %s -i %s_in.wav -o %s_out.wav", GOOGLE_ASSISTANT_JSON_FILE_ROUTE,fileName,fileName);
+        String soxConvertOptions = "\"filename_out.wav\" -t raw -r 8k -e signed-integer -b 16 -c 1 \"filename_8k.sln\"\n";
+        
 
         answer();
+        //record the user audio
+        recordFile(fileName, ".wav", "#", 2);
 
-        streamFile("welcome");
-        streamFile("tt-monkeys");
+        //say thanks to the user
+        playBack(THANKS_AUDIO_FILE_ROUTE);
+
+        //change aoudio format
+        runShCommand(SOX_COMMAND, "wav -r 16000 "+fileName+"_in.wav");
+
+        //use google command
+        runShCommand(GOOGLE_ASSISTANT_COMMAND, googleOptions);
+
+        //cambiar formato de audio del google
+        runShCommand(SOX_COMMAND, soxConvertOptions.replace("filename", fileName));
+        //reproducir 
+        playBack(fileName+"_8k");
+        
+        // streamFile("welcome");
+        // streamFile("tt-monkeys");
 
         hangup();
     }
+
+    public void playBack(String thanksRoute){
+        try {
+            streamFile(thanksRoute);
+            setExtension("9997");
+            setPriority("1");
+        } catch (AgiException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    public void runShCommand(String commad,String options) {
+        try {
+            Process process = Runtime.getRuntime().exec(commad+options);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
+
+
 }
