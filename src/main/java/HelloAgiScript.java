@@ -6,11 +6,18 @@ import org.asteriskjava.fastagi.*;
 
 import java.io.IOException;
 import java.lang.Math;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 public class HelloAgiScript extends BaseAgiScript{
 
     static public String THANKS_AUDIO_FILE_ROUTE = "/usr/share/asterisk/sounds/en/auth-thankyou";
+    static public String HELLO_AUDIO_FILE_ROUTE = "/usr/share/asterisk/sounds/custom/google_hello";
+    static public String EXMAPLE_AUDIO_FILE_ROUTE = "/usr/share/asterisk/sounds/custom/google_example";
+    static public String ANOTHER_AUDIO_FILE_ROUTE = "/usr/share/asterisk/sounds/custom/google_another";
+    static public String BEEP_FILE_ROUTE = "/usr/share/asterisk/sounds/en/beep";
     static public String SOX_COMMAND = "/usr/bin/sox";
+    static public String PERMISSION_COMMAND = "sudo chmod";
     static public String GOOGLE_ASSISTANT_COMMAND = "googlesamples-assistant-pushtotalk";
     static public String GOOGLE_ASSISTANT_JSON_FILE_ROUTE = "/home/pi/.config/google-oauthlib-tool/credentials.json";
 
@@ -20,52 +27,84 @@ public class HelloAgiScript extends BaseAgiScript{
 
     @Override
     public void service(AgiRequest request, AgiChannel channel) throws AgiException {
-        String fileName = "/tmp/google_audio"+Math.random();
-        String googleOptions = String.format("--credentials %s -i %s_in.wav -o %s_out.wav", GOOGLE_ASSISTANT_JSON_FILE_ROUTE,fileName,fileName);
-        String soxConvertOptions = "\"filename_out.wav\" -t raw -r 8k -e signed-integer -b 16 -c 1 \"filename_8k.sln\"\n";
+		Random fileNumber = new Random();
+        String fileName = "/tmp/google_audio"+fileNumber.nextInt();
+        String googleOptions = String.format(" --credentials %s -i %s_in.wav -o %s_out.wav", GOOGLE_ASSISTANT_JSON_FILE_ROUTE,fileName,fileName);
+        String soxConverInputOptions = " filename.wav -r 16000 filename_in.wav";
+        String soxConvertOutputOptions = " filename_out.wav -t raw -r 8k -e signed-integer -b 16 -c 1 filename_8k.sln";
+        String chmodOptions = String.format(" 777 %s.wav",fileName);
+        boolean hasStarted = false;
         
 
-        answer();
-        //record the user audio
-        recordFile(fileName, ".wav", "#", 2);
-
-        //say thanks to the user
-        playBack(THANKS_AUDIO_FILE_ROUTE);
-
-        //change aoudio format
-        runShCommand(SOX_COMMAND, "wav -r 16000 "+fileName+"_in.wav");
-
-        //use google command
-        runShCommand(GOOGLE_ASSISTANT_COMMAND, googleOptions);
-
-        //cambiar formato de audio del google
-        runShCommand(SOX_COMMAND, soxConvertOptions.replace("filename", fileName));
-        //reproducir 
-        playBack(fileName+"_8k");
+        //introduction
+        if(!hasStarted){
+			
+			playBack(HELLO_AUDIO_FILE_ROUTE);
+			playBack(EXMAPLE_AUDIO_FILE_ROUTE);	
+		}
+		while(!hasStarted){
+			//make 'beep' sound 
+			playBack(BEEP_FILE_ROUTE);
         
-        // streamFile("welcome");
-        // streamFile("tt-monkeys");
+			//record the user audio
+			recordFile(fileName, "wav", "#", -1);
 
-        hangup();
+			//say thanks to the user
+			playBack(THANKS_AUDIO_FILE_ROUTE);
+        
+			//permissions to change input
+			runShCommand(PERMISSION_COMMAND,chmodOptions);
+        
+			//change audio format
+			runShCommand(SOX_COMMAND, soxConverInputOptions.replace("filename", fileName));
+
+			//use google command
+			runShCommand(GOOGLE_ASSISTANT_COMMAND, googleOptions);
+        
+			//permissions to change output
+			runShCommand(PERMISSION_COMMAND,chmodOptions.replace(fileName+".wav",fileName+"_out.wav"));
+
+			//cambiar formato de audio del google
+			runShCommand(SOX_COMMAND, soxConvertOutputOptions.replace("filename", fileName));
+        
+			//reproducir 
+			playBack(fileName+"_8k");
+        
+			//ask another question
+			playBack(ANOTHER_AUDIO_FILE_ROUTE);	
+		}
+        
+        
     }
 
-    public void playBack(String thanksRoute){
+    public void playBack(String audioRoute){
         try {
-            streamFile(thanksRoute);
+            streamFile(audioRoute);
             setExtension("9997");
             setPriority("1");
         } catch (AgiException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+			System.out.println("could not play audio file "+audioRoute);
+            System.out.println(e.toString());
+            System.out.println("");
         }
     }
 
     public void runShCommand(String commad,String options) {
+		String fullCommand = commad+options;
         try {
-            Process process = Runtime.getRuntime().exec(commad+options);
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-			e.printStackTrace();
+            Process process = Runtime.getRuntime().exec(fullCommand);
+            int exitCode = 0;
+            if(fullCommand.contains(GOOGLE_ASSISTANT_COMMAND)){
+				process.waitFor(30,TimeUnit.SECONDS);
+			}else{
+				exitCode = process.waitFor();
+			}
+            System.out.println(fullCommand+" exit with code "+exitCode);
+            System.out.println("");
+        } catch (IOException | InterruptedException e) {
+            System.out.println(fullCommand+" failed");
+            System.out.println(e.toString());
+            System.out.println("");
 		}
     }
 
