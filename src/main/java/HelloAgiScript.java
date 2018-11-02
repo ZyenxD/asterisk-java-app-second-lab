@@ -27,86 +27,42 @@ public class HelloAgiScript extends BaseAgiScript{
 
     @Override
     public void service(AgiRequest request, AgiChannel channel) throws AgiException {
+        Pipeline loopPipeline = new Pipeline();
+        Pipeline startPipeline = new Pipeline();
+
 		Random fileNumber = new Random();
         String fileName = "/tmp/google_audio"+fileNumber.nextInt();
-        String googleOptions = String.format(" --credentials %s -i %s_in.wav -o %s_out.wav", GOOGLE_ASSISTANT_JSON_FILE_ROUTE,fileName,fileName);
-        String soxConverInputOptions = " filename.wav -r 16000 filename_in.wav";
-        String soxConvertOutputOptions = " filename_out.wav -t raw -r 8k -e signed-integer -b 16 -c 1 filename_8k.sln";
-        String chmodOptions = String.format(" 777 %s.wav",fileName);
-        boolean hasStarted = false;
+        String googleCommand = String.format("%s --credentials %s -i %s_in.wav -o %s_out.wav",GOOGLE_ASSISTANT_COMMAND,GOOGLE_ASSISTANT_JSON_FILE_ROUTE,fileName,fileName);
+        String soxConvertInputCommand = String.format("%s filename.wav -r 16000 filename_in.wav",SOX_COMMAND);
+        String soxConvertOutputCommand = String.format("%s filename_out.wav -t raw -r 8k -e signed-integer -b 16 -c 1 filename_8k.sln",SOX_COMMAND);
+        String chmodCommand = String.format("%s 777 %s.wav",PERMISSION_COMMAND,fileName);
+
+        startPipeline.addCommand(new StreamPipe("PLAY_EXAMPLE_FILE"),EXMAPLE_AUDIO_FILE_ROUTE);
+        startPipeline.addCommand(new StreamPipe("PLAY_WELCOME_FILE"),HELLO_AUDIO_FILE_ROUTE);
+
+        loopPipeline.addCommand( new StreamPipe("PLAY_ANOTHER_FILE"),ANOTHER_AUDIO_FILE_ROUTE);
+        loopPipeline.addCommand( new StreamPipe("PLAY_GOOGLE_OUTPUT"),fileName+"_8k");
+        loopPipeline.addCommand( new ProcessPipe("CONVERT_OUTPUT_AUDIO_FILE"),soxConvertOutputCommand.replace("filename", fileName));
+        loopPipeline.addCommand( new ProcessPipe("GRANT_PERMISSION_TO_MODIFY_OUTPUT"),chmodCommand.replace(fileName+".wav",fileName+"_out.wav"));
+        loopPipeline.addCommand( new ProcessPipe("RUN_GOOGLE_ASSISTANT"),googleCommand);
+        loopPipeline.addCommand( new ProcessPipe("CONVERT_INPUT_AUDIO_FILE"),soxConvertInputCommand.replace("filename", fileName));
+        loopPipeline.addCommand( new ProcessPipe("GRANT_PERMISSION_TO_MODIFY_INPUT"),chmodCommand);
+        loopPipeline.addCommand( new StreamPipe("PLAY_THANKS_FILE"),THANKS_AUDIO_FILE_ROUTE);
+        loopPipeline.addCommand( new RecordPipe("RECORD_INPUT_FILE"),fileName);
+        loopPipeline.addCommand( new StreamPipe("PLAY_BEEP_FILE"),BEEP_FILE_ROUTE);
+        boolean started = true;
         
 
         //introduction
-        if(!hasStarted){
-			
-			playBack(HELLO_AUDIO_FILE_ROUTE);
-			playBack(EXMAPLE_AUDIO_FILE_ROUTE);	
-		}
-		while(!hasStarted){
-			//make 'beep' sound 
-			playBack(BEEP_FILE_ROUTE);
-        
-			//record the user audio
-			recordFile(fileName, "wav", "#", -1);
+        startPipeline.execute();
 
-			//say thanks to the user
-			playBack(THANKS_AUDIO_FILE_ROUTE);
-        
-			//permissions to change input
-			runShCommand(PERMISSION_COMMAND,chmodOptions);
-        
-			//change audio format
-			runShCommand(SOX_COMMAND, soxConverInputOptions.replace("filename", fileName));
-
-			//use google command
-			runShCommand(GOOGLE_ASSISTANT_COMMAND, googleOptions);
-        
-			//permissions to change output
-			runShCommand(PERMISSION_COMMAND,chmodOptions.replace(fileName+".wav",fileName+"_out.wav"));
-
-			//cambiar formato de audio del google
-			runShCommand(SOX_COMMAND, soxConvertOutputOptions.replace("filename", fileName));
-        
-			//reproducir 
-			playBack(fileName+"_8k");
-        
-			//ask another question
-			playBack(ANOTHER_AUDIO_FILE_ROUTE);	
+		while(started){
+		    loopPipeline.execute();
 		}
         
         
     }
 
-    public void playBack(String audioRoute){
-        try {
-            streamFile(audioRoute);
-            setExtension("9997");
-            setPriority("1");
-        } catch (AgiException e) {
-			System.out.println("could not play audio file "+audioRoute);
-            System.out.println(e.toString());
-            System.out.println("");
-        }
-    }
-
-    public void runShCommand(String commad,String options) {
-		String fullCommand = commad+options;
-        try {
-            Process process = Runtime.getRuntime().exec(fullCommand);
-            int exitCode = 0;
-            if(fullCommand.contains(GOOGLE_ASSISTANT_COMMAND)){
-				process.waitFor(30,TimeUnit.SECONDS);
-			}else{
-				exitCode = process.waitFor();
-			}
-            System.out.println(fullCommand+" exit with code "+exitCode);
-            System.out.println("");
-        } catch (IOException | InterruptedException e) {
-            System.out.println(fullCommand+" failed");
-            System.out.println(e.toString());
-            System.out.println("");
-		}
-    }
 
 
 }

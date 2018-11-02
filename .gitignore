@@ -6,6 +6,7 @@ bin/
 .gradle/
 .vscode/
 build/
+.idea/
 
 # Log file
 *.log
