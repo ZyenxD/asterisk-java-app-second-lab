@@ -4,7 +4,6 @@
 
 import org.asteriskjava.fastagi.*;
 
-import javax.naming.NamingException;
 import java.io.IOException;
 import java.lang.Math;
 import java.util.Random;
@@ -38,35 +37,29 @@ public class HelloAgiScript extends BaseAgiScript{
         String soxConvertOutputCommand = String.format("%s filename_out.wav -t raw -r 8k -e signed-integer -b 16 -c 1 filename_8k.sln",SOX_COMMAND);
         String chmodCommand = String.format("%s 777 %s.wav",PERMISSION_COMMAND,fileName);
 
+		startPipeline.addCommand(new StreamPipe("PLAY_WELCOME_FILE"),HELLO_AUDIO_FILE_ROUTE);
         startPipeline.addCommand(new StreamPipe("PLAY_EXAMPLE_FILE"),EXMAPLE_AUDIO_FILE_ROUTE);
-        startPipeline.addCommand(new StreamPipe("PLAY_WELCOME_FILE"),HELLO_AUDIO_FILE_ROUTE);
 
-        loopPipeline.addCommand( new StreamPipe("PLAY_ANOTHER_FILE"),ANOTHER_AUDIO_FILE_ROUTE);
-        loopPipeline.addCommand( new StreamPipe("PLAY_GOOGLE_OUTPUT"),fileName+"_8k");
-        loopPipeline.addCommand( new ProcessPipe("CONVERT_OUTPUT_AUDIO_FILE"),soxConvertOutputCommand.replace("filename", fileName));
-        loopPipeline.addCommand( new ProcessPipe("GRANT_PERMISSION_TO_MODIFY_OUTPUT"),chmodCommand.replace(fileName+".wav",fileName+"_out.wav"));
-        loopPipeline.addCommand( new ProcessPipe("RUN_GOOGLE_ASSISTANT"),googleCommand);
-        loopPipeline.addCommand( new ProcessPipe("CONVERT_INPUT_AUDIO_FILE"),soxConvertInputCommand.replace("filename", fileName));
-        loopPipeline.addCommand( new ProcessPipe("GRANT_PERMISSION_TO_MODIFY_INPUT"),chmodCommand);
-        loopPipeline.addCommand( new StreamPipe("PLAY_THANKS_FILE"),THANKS_AUDIO_FILE_ROUTE);
-        loopPipeline.addCommand( new RecordPipe("RECORD_INPUT_FILE"),fileName);
         loopPipeline.addCommand( new StreamPipe("PLAY_BEEP_FILE"),BEEP_FILE_ROUTE);
+        loopPipeline.addCommand( new RecordPipe("RECORD_INPUT_FILE"),fileName);
+		loopPipeline.addCommand( new StreamPipe("PLAY_THANKS_FILE"),THANKS_AUDIO_FILE_ROUTE);
+		loopPipeline.addCommand( new ProcessPipe("GRANT_PERMISSION_TO_MODIFY_INPUT"),chmodCommand);
+		loopPipeline.addCommand( new ProcessPipe("CONVERT_INPUT_AUDIO_FILE"),soxConvertInputCommand.replace("filename", fileName));
+		loopPipeline.addCommand( new ProcessPipe("RUN_GOOGLE_ASSISTANT"),googleCommand);
+		loopPipeline.addCommand( new ProcessPipe("GRANT_PERMISSION_TO_MODIFY_OUTPUT"),chmodCommand.replace(fileName+".wav",fileName+"_out.wav"));
+		loopPipeline.addCommand( new ProcessPipe("CONVERT_OUTPUT_AUDIO_FILE"),soxConvertOutputCommand.replace("filename", fileName));
+		loopPipeline.addCommand( new StreamPipe("PLAY_GOOGLE_OUTPUT"),fileName+"_8k");
+        loopPipeline.addCommand( new StreamPipe("PLAY_ANOTHER_FILE"),ANOTHER_AUDIO_FILE_ROUTE);
+        
+
         boolean started = true;
         
 
         //introduction
-        try {
-            startPipeline.execute();
-        } catch (NamingException e) {
-            e.printStackTrace();
-        }
+        startPipeline.execute();
 
-        while(true){
-            try {
-                loopPipeline.execute();
-            } catch (NamingException e) {
-                e.printStackTrace();
-            }
+        while(started){
+          loopPipeline.execute();
         }
         
         

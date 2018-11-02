@@ -5,14 +5,10 @@ import java.util.concurrent.TimeUnit;
 
 public class ProcessPipe extends AgiOperations implements Pipeline.Command<String> {
 
-    public String getInputName() {
-        return inputName;
-    }
-
     private String inputName;
 
     public ProcessPipe(String name) {
-        this.inputName = inputName;
+        this.inputName = name;
     }
 
     public void runShCommand(String fullCommand) {
@@ -42,5 +38,8 @@ public class ProcessPipe extends AgiOperations implements Pipeline.Command<Strin
     @Override
     public void execute(String input) {
         runShCommand(input);
+    }
+    public String getInputName() {
+        return inputName;
     }
 }
