@@ -1,30 +1,24 @@
-import java.util.Random;
+import java.util.Hashtable;
 import java.util.Stack;
 import javax.naming.Context;
+import javax.naming.InitialContext;
 import javax.naming.NamingException;
 
 public class Pipeline  {
     private Context pipeContext;
+    private Hashtable<String, String> contextInit = new Hashtable<String, String>();
     private Stack<Command<Object>> pipelineCommandStack = new Stack<Command<Object>>();
 
 
     public void addCommand(Command command, String commandInput){
         pipelineCommandStack.add(command);
-        try {
-            pipeContext.bind(command.getCommandName(),commandInput);
-        } catch (NamingException e) {
-            e.printStackTrace();
-        }
+        contextInit.put(command.getCommandName(),commandInput);
     }
 
-    public void fillPipeContext(){
-        Random fileNumber = new Random();
-        String fileName = "/tmp/google_audio"+fileNumber.nextInt();
-    }
-
-    public void execute(){
+    public void execute() throws NamingException {
         String commandName;
-        for (Command command : pipelineCommandStack){
+        pipeContext = new InitialContext(contextInit);
+        for (Command<Object> command : pipelineCommandStack){
             try {
                 commandName = (String) pipeContext.lookup(command.getCommandName());
                 command.execute(commandName);

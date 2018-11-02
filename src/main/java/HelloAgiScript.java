@@ -4,6 +4,7 @@
 
 import org.asteriskjava.fastagi.*;
 
+import javax.naming.NamingException;
 import java.io.IOException;
 import java.lang.Math;
 import java.util.Random;
@@ -54,11 +55,19 @@ public class HelloAgiScript extends BaseAgiScript{
         
 
         //introduction
-        startPipeline.execute();
+        try {
+            startPipeline.execute();
+        } catch (NamingException e) {
+            e.printStackTrace();
+        }
 
-		while(started){
-		    loopPipeline.execute();
-		}
+        while(true){
+            try {
+                loopPipeline.execute();
+            } catch (NamingException e) {
+                e.printStackTrace();
+            }
+        }
         
         
     }
